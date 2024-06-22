@@ -111,7 +111,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgements
 
-- [YOLOv8](https://github.com/ultralytics/yolov8) for the object detection model.
+- [YOLOv8](https://github.com/ultralytics/ultralytics) for the object detection model.
 - [TensorFlow Lite](https://www.tensorflow.org/lite) for providing the framework to run the model on mobile devices.
 - [Android Studio](https://developer.android.com/studio) for the development environment.
 - [Google Colab](https://colab.research.google.com) for providing a cloud-based Jupyter notebook environment.
