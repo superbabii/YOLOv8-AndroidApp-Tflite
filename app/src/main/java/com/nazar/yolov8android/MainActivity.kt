@@ -18,7 +18,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener {
-    private lateinit var activityMainBinding: ActivityMainBinding
+    private lateinit var binding: ActivityMainBinding
     private val isFrontCamera = false
 
     private var preview: Preview? = null
@@ -27,41 +27,44 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     private var cameraProvider: ProcessCameraProvider? = null
     private var detector: ObjectDetectorHelper? = null
 
-    private lateinit var cameraExecutor: ExecutorService
+    private val cameraExecutor: ExecutorService by lazy {
+        Executors.newSingleThreadExecutor()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        activityMainBinding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(activityMainBinding.root)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        cameraExecutor = Executors.newSingleThreadExecutor()
-
-        cameraExecutor.execute {
-            detector = ObjectDetectorHelper(baseContext, this)
-            detector?.setup()
-        }
+        initializeDetector()
 
         if (allPermissionsGranted()) {
             setUpCamera()
         } else {
-            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+            requestPermissions()
         }
 
         bindListeners()
     }
 
+    private fun initializeDetector() {
+        cameraExecutor.execute {
+            detector = ObjectDetectorHelper(baseContext, this)
+            detector?.setup()
+        }
+    }
+
     private fun bindListeners() {
-        activityMainBinding.apply {
-            toggleGpu.setOnCheckedChangeListener { buttonView, isChecked ->
-                cameraExecutor.submit {
-                    detector?.setup(toggleGpu = isChecked)
-                }
-                if (isChecked) {
-                    buttonView.setBackgroundColor(ContextCompat.getColor(baseContext, R.color.button_color))
-                } else {
-                    buttonView.setBackgroundColor(ContextCompat.getColor(baseContext, R.color.gray))
-                }
+        binding.toggleGpu.setOnCheckedChangeListener { buttonView, isChecked ->
+            cameraExecutor.submit {
+                detector?.setup(toggleGpu = isChecked)
             }
+            buttonView.setBackgroundColor(
+                ContextCompat.getColor(
+                    baseContext,
+                    if (isChecked) R.color.button_color else R.color.gray
+                )
+            )
         }
     }
 
@@ -75,8 +78,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
     private fun bindCameraUseCases() {
         val cameraProvider = cameraProvider ?: throw IllegalStateException("Camera initialization failed.")
-
-        val rotation = activityMainBinding.viewFinder.display.rotation
+        val rotation = binding.viewFinder.display.rotation
 
         val cameraSelector = CameraSelector.Builder()
             .requireLensFacing(CameraSelector.LENS_FACING_BACK)
@@ -90,39 +92,12 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         imageAnalyzer = ImageAnalysis.Builder()
             .setTargetAspectRatio(AspectRatio.RATIO_4_3)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-            .setTargetRotation(activityMainBinding.viewFinder.display.rotation)
+            .setTargetRotation(rotation)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .build()
 
         imageAnalyzer?.setAnalyzer(cameraExecutor) { imageProxy ->
-            val bitmapBuffer =
-                Bitmap.createBitmap(
-                    imageProxy.width,
-                    imageProxy.height,
-                    Bitmap.Config.ARGB_8888
-                )
-            imageProxy.use { bitmapBuffer.copyPixelsFromBuffer(imageProxy.planes[0].buffer) }
-            imageProxy.close()
-
-            val matrix = Matrix().apply {
-                postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
-
-                if (isFrontCamera) {
-                    postScale(
-                        -1f,
-                        1f,
-                        imageProxy.width.toFloat(),
-                        imageProxy.height.toFloat()
-                    )
-                }
-            }
-
-            val rotatedBitmap = Bitmap.createBitmap(
-                bitmapBuffer, 0, 0, bitmapBuffer.width, bitmapBuffer.height,
-                matrix, true
-            )
-
-            detector?.detect(rotatedBitmap)
+            processImageProxy(imageProxy)
         }
 
         cameraProvider.unbindAll()
@@ -135,20 +110,47 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
                 imageAnalyzer
             )
 
-            preview?.setSurfaceProvider(activityMainBinding.viewFinder.surfaceProvider)
+            preview?.setSurfaceProvider(binding.viewFinder.surfaceProvider)
         } catch (exc: Exception) {
             Log.e(TAG, "Use case binding failed", exc)
         }
+    }
+
+    private fun processImageProxy(imageProxy: ImageProxy) {
+        val bitmapBuffer = Bitmap.createBitmap(imageProxy.width, imageProxy.height, Bitmap.Config.ARGB_8888)
+        imageProxy.use { bitmapBuffer.copyPixelsFromBuffer(imageProxy.planes[0].buffer) }
+
+        val matrix = Matrix().apply {
+            postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
+            if (isFrontCamera) {
+                postScale(-1f, 1f, imageProxy.width.toFloat(), imageProxy.height.toFloat())
+            }
+        }
+
+        val rotatedBitmap = Bitmap.createBitmap(
+            bitmapBuffer, 0, 0, bitmapBuffer.width, bitmapBuffer.height,
+            matrix, true
+        )
+
+        detector?.detect(rotatedBitmap)
+        imageProxy.close()
     }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
     }
 
+    private fun requestPermissions() {
+        ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+    }
+
     private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()) {
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
         if (it[Manifest.permission.CAMERA] == true) {
             setUpCamera()
+        } else {
+            Log.e(TAG, "Camera permission denied.")
         }
     }
 
@@ -167,25 +169,17 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         }
     }
 
-    companion object {
-        private const val TAG = "Camera"
-        private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = mutableListOf(
-            Manifest.permission.CAMERA
-        ).toTypedArray()
-    }
-
     override fun onEmptyDetect() {
         runOnUiThread {
-            activityMainBinding.overlay.clear()
-            println("empty detect")
+            binding.overlay.clear()
+            Log.d(TAG, "No detection results")
         }
     }
 
     override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
         runOnUiThread {
-            activityMainBinding.inferenceTime.text = "Inference Time: ${inferenceTime}ms"
-            activityMainBinding.overlay.apply {
+            binding.inferenceTime.text = "Inference Time: ${inferenceTime}ms"
+            binding.overlay.apply {
                 setResults(boundingBoxes)
                 invalidate()
             }
@@ -194,11 +188,15 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
     override fun onBackPressed() {
         if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
-            // Workaround for Android Q memory leak issue in IRequestFinishCallback$Stub.
-            // (https://issuetracker.google.com/issues/139738913)
-            finishAfterTransition()
+            finishAfterTransition() // Workaround for Android Q memory leak issue.
         } else {
             super.onBackPressed()
         }
+    }
+
+    companion object {
+        private const val TAG = "Camera"
+        private const val REQUEST_CODE_PERMISSIONS = 10
+        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
     }
 }
