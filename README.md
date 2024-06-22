@@ -36,7 +36,7 @@ The YOLOv8 Android App is a mobile application that leverages the YOLOv8 model f
 
 1. **Clone the repository:**
     ```bash
-    git clone https://github.com/yourusername/YOLOv8-AndroidApp.git
+    git clone https://github.com/superbabii/YOLOv8-AndroidApp.git
     cd YOLOv8-AndroidApp
     ```
 
