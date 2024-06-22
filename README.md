@@ -93,7 +93,7 @@ The input and output tensor formats of the TensorFlow Lite model are as follows:
 - **Input tensor:** float32[1,640,640,3] or float32[1,3,640,640]
 - **Output tensor:** float32[1,84,8400]
 
-There is no longer a need to worry about tensor format or metadata issues that were previously encountered when using TensorFlow Lite's object detection example for Android (https://github.com/tensorflow/examples/tree/master/lite/examples/object_detection/android).
+There is no longer a need to worry about tensor format or metadata issues that were previously encountered when using [TensorFlow Lite's object detection example for Android](https://github.com/tensorflow/examples/tree/master/lite/examples/object_detection/android).
 
 ## Contributing
 
