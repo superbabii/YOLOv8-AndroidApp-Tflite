@@ -1,8 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Primary Colors -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="bounding_box_color">#ff6f00</color>
-    <color name="gray">#999</color>
-    <color name="button_color">#7308bd</color>
+
+    <!-- Accent Colors -->
+    <color name="bounding_box_color">#FF6F00</color> <!-- Orange for bounding boxes -->
+    <color name="button_color">#7308BD</color> <!-- Purple for buttons -->
+
+    <!-- Neutral Colors -->
+    <color name="gray">#999999</color>
+
+    <!-- Additional Colors -->
+    <color name="red">#FFFF0000</color>
+    <color name="green">#FF00FF00</color>
+    <color name="blue">#FF0000FF</color>
+    <color name="light_gray">#FFCCCCCC</color>
+    <color name="dark_gray">#FF444444</color>
 </resources>

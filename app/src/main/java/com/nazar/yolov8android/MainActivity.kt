@@ -9,11 +9,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.AspectRatio
-import androidx.camera.core.Camera
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.Preview
+import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -56,9 +52,9 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
     private fun bindListeners() {
         activityMainBinding.apply {
-            isGpu.setOnCheckedChangeListener { buttonView, isChecked ->
+            toggleGpu.setOnCheckedChangeListener { buttonView, isChecked ->
                 cameraExecutor.submit {
-                    detector?.setup(isGpu = isChecked)
+                    detector?.setup(toggleGpu = isChecked)
                 }
                 if (isChecked) {
                     buttonView.setBackgroundColor(ContextCompat.getColor(baseContext, R.color.button_color))
@@ -72,7 +68,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     private fun setUpCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
         cameraProviderFuture.addListener({
-            cameraProvider  = cameraProviderFuture.get()
+            cameraProvider = cameraProviderFuture.get()
             bindCameraUseCases()
         }, ContextCompat.getMainExecutor(this))
     }
@@ -82,12 +78,11 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
         val rotation = activityMainBinding.viewFinder.display.rotation
 
-        val cameraSelector = CameraSelector
-            .Builder()
+        val cameraSelector = CameraSelector.Builder()
             .requireLensFacing(CameraSelector.LENS_FACING_BACK)
             .build()
 
-        preview =  Preview.Builder()
+        preview = Preview.Builder()
             .setTargetAspectRatio(AspectRatio.RATIO_4_3)
             .setTargetRotation(rotation)
             .build()
@@ -141,7 +136,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
             )
 
             preview?.setSurfaceProvider(activityMainBinding.viewFinder.surfaceProvider)
-        } catch(exc: Exception) {
+        } catch (exc: Exception) {
             Log.e(TAG, "Use case binding failed", exc)
         }
     }
@@ -152,7 +147,9 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()) {
-        if (it[Manifest.permission.CAMERA] == true) { setUpCamera() }
+        if (it[Manifest.permission.CAMERA] == true) {
+            setUpCamera()
+        }
     }
 
     override fun onDestroy() {
@@ -163,7 +160,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
     override fun onResume() {
         super.onResume()
-        if (allPermissionsGranted()){
+        if (allPermissionsGranted()) {
             setUpCamera()
         } else {
             requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
@@ -173,7 +170,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     companion object {
         private const val TAG = "Camera"
         private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = mutableListOf (
+        private val REQUIRED_PERMISSIONS = mutableListOf(
             Manifest.permission.CAMERA
         ).toTypedArray()
     }
@@ -187,7 +184,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
     override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
         runOnUiThread {
-            activityMainBinding.inferenceTime.text = "${inferenceTime}ms"
+            activityMainBinding.inferenceTime.text = "Inference Time: ${inferenceTime}ms"
             activityMainBinding.overlay.apply {
                 setResults(boundingBoxes)
                 invalidate()
