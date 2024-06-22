@@ -27,7 +27,7 @@ The YOLOv8 Android App is a mobile application that leverages the YOLOv8 model f
 
 ## Screenshots
 
-Include some screenshots of your app here.
+some screenshots of the app
 
 ## Installation
 
