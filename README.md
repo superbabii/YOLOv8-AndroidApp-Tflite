@@ -77,7 +77,8 @@ To convert the YOLOv8 model to TensorFlow Lite, follow the steps provided in the
 5. **Move the TFLite model to the Android project:**
     - Navigate to the Android project directory: `app/src/main/assets/`.
     - Replace the existing `model.tflite` file with the downloaded `.tflite` file.
-      * The default model in 'app/src/main/assets' is converted from [yolovn8.pt](https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.pt).
+      
+   * The default model in `app/src/main/assets/` is converted from [yolovn8.pt](https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.pt).
 
 ## Model Details
 
