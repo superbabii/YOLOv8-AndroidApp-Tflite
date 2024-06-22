@@ -6,7 +6,6 @@ This repository contains an Android application utilizing a TensorFlow Lite mode
 
 - [Introduction](#introduction)
 - [Features](#features)
-- [Screenshots](#screenshots)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Model Conversion](#model-conversion)
@@ -25,10 +24,6 @@ The YOLOv8 Android App is a mobile application that leverages the YOLOv8 model f
 - Real-time object detection using YOLOv8
 - Efficient processing with TensorFlow Lite
 - User-friendly interface
-
-## Screenshots
-
-some screenshots of app.
 
 ## Installation
 
