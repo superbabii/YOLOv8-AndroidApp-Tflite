@@ -7,6 +7,11 @@ import android.graphics.Matrix
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -21,11 +26,13 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     private lateinit var binding: ActivityMainBinding
     private val isFrontCamera = false
 
+    private lateinit var detector: ObjectDetectorHelper
+    private lateinit var bitmapBuffer: Bitmap
+
     private var preview: Preview? = null
     private var imageAnalyzer: ImageAnalysis? = null
     private var camera: Camera? = null
     private var cameraProvider: ProcessCameraProvider? = null
-    private var detector: ObjectDetectorHelper? = null
 
     private val cameraExecutor: ExecutorService by lazy {
         Executors.newSingleThreadExecutor()
@@ -36,36 +43,117 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        initializeDetector()
-
         if (allPermissionsGranted()) {
-            setUpCamera()
-        } else {
-            requestPermissions()
-        }
-
-        bindListeners()
-    }
-
-    private fun initializeDetector() {
-        cameraExecutor.execute {
-            detector = ObjectDetectorHelper(baseContext, this)
-            detector?.setup()
-        }
-    }
-
-    private fun bindListeners() {
-        binding.toggleGpu.setOnCheckedChangeListener { buttonView, isChecked ->
-            cameraExecutor.submit {
-                detector?.setup(toggleGpu = isChecked)
+            setUpDetector()
+            binding.viewFinder.post {
+                setUpCamera()
             }
-            buttonView.setBackgroundColor(
-                ContextCompat.getColor(
-                    baseContext,
-                    if (isChecked) R.color.button_color else R.color.gray
-                )
-            )
+        } else {
+            requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
         }
+
+        initBottomSheetControls()
+    }
+
+    private fun setUpDetector() {
+        cameraExecutor.execute {
+            detector = ObjectDetectorHelper(0.5f, 2, 3, 0, baseContext, this)
+            detector.setupObjectDetector()
+        }
+    }
+
+    private fun initBottomSheetControls() {
+        // When clicked, lower detection score threshold floor
+        binding.bottomSheetLayout.thresholdMinus.setOnClickListener {
+            if (detector.threshold >= 0.1) {
+                detector.threshold -= 0.1f
+                updateControlsUi()
+            }
+        }
+
+        // When clicked, raise detection score threshold floor
+        binding.bottomSheetLayout.thresholdPlus.setOnClickListener {
+            if (detector.threshold <= 0.8) {
+                detector.threshold += 0.1f
+                updateControlsUi()
+            }
+        }
+
+        // When clicked, reduce the number of objects that can be detected at a time
+        binding.bottomSheetLayout.maxResultsMinus.setOnClickListener {
+            if (detector.maxResults > 1) {
+                detector.maxResults--
+                updateControlsUi()
+            }
+        }
+
+        // When clicked, increase the number of objects that can be detected at a time
+        binding.bottomSheetLayout.maxResultsPlus.setOnClickListener {
+            if (detector.maxResults < 5) {
+                detector.maxResults++
+                updateControlsUi()
+            }
+        }
+
+        // When clicked, decrease the number of threads used for detection
+        binding.bottomSheetLayout.threadsMinus.setOnClickListener {
+            if (detector.numThreads > 1) {
+                detector.numThreads--
+                updateControlsUi()
+            }
+        }
+
+        // When clicked, increase the number of threads used for detection
+        binding.bottomSheetLayout.threadsPlus.setOnClickListener {
+            if (detector.numThreads < 4) {
+                detector.numThreads++
+                updateControlsUi()
+            }
+        }
+
+        // When clicked, change the underlying hardware used for inference. Current options are CPU
+        // GPU, and NNAPI
+        binding.bottomSheetLayout.spinnerDelegate.setSelection(0, false)
+        binding.bottomSheetLayout.spinnerDelegate.onItemSelectedListener =
+            object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
+                    detector.currentDelegate = p2
+                    updateControlsUi()
+                }
+
+                override fun onNothingSelected(p0: AdapterView<*>?) {
+                    /* no op */
+                }
+            }
+
+        // When clicked, change the underlying model used for object detection
+//        binding.bottomSheetLayout.spinnerModel.setSelection(0, false)
+//        binding.bottomSheetLayout.spinnerModel.onItemSelectedListener =
+//            object : AdapterView.OnItemSelectedListener {
+//                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
+//                    detector.currentModel = p2
+//                    updateControlsUi()
+//                }
+//
+//                override fun onNothingSelected(p0: AdapterView<*>?) {
+//                    /* no op */
+//                }
+//            }
+    }
+
+    // Update the values displayed in the bottom sheet. Reset detector.
+    private fun updateControlsUi() {
+        binding.bottomSheetLayout.maxResultsValue.text =
+            detector.maxResults.toString()
+        binding.bottomSheetLayout.thresholdValue.text =
+            String.format("%.2f", detector.threshold)
+        binding.bottomSheetLayout.threadsValue.text =
+            detector.numThreads.toString()
+
+        // Needs to be cleared instead of reinitialized because the GPU
+        // delegate needs to be initialized on the thread using it when applicable
+        detector.clearObjectDetector()
+        binding.overlay.clear()
     }
 
     private fun setUpCamera() {
@@ -95,10 +183,19 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
             .setTargetRotation(rotation)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .build()
+            .also {
+                it.setAnalyzer(cameraExecutor) { image ->
+                    if (!::bitmapBuffer.isInitialized) {
+                        bitmapBuffer = Bitmap.createBitmap(
+                            image.width,
+                            image.height,
+                            Bitmap.Config.ARGB_8888
+                        )
+                    }
 
-        imageAnalyzer?.setAnalyzer(cameraExecutor) { imageProxy ->
-            processImageProxy(imageProxy)
-        }
+                    detectObjects(image)
+                }
+            }
 
         cameraProvider.unbindAll()
 
@@ -116,14 +213,14 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         }
     }
 
-    private fun processImageProxy(imageProxy: ImageProxy) {
-        val bitmapBuffer = Bitmap.createBitmap(imageProxy.width, imageProxy.height, Bitmap.Config.ARGB_8888)
-        imageProxy.use { bitmapBuffer.copyPixelsFromBuffer(imageProxy.planes[0].buffer) }
+    private fun detectObjects(image: ImageProxy) {
+        // Copy out RGB bits to the shared bitmap buffer
+        image.use { bitmapBuffer.copyPixelsFromBuffer(image.planes[0].buffer) }
 
         val matrix = Matrix().apply {
-            postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
+            postRotate(image.imageInfo.rotationDegrees.toFloat())
             if (isFrontCamera) {
-                postScale(-1f, 1f, imageProxy.width.toFloat(), imageProxy.height.toFloat())
+                postScale(-1f, 1f, image.width.toFloat(), image.height.toFloat())
             }
         }
 
@@ -133,22 +230,21 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         )
 
         detector?.detect(rotatedBitmap)
-        imageProxy.close()
+//        image.close()
     }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
     }
 
-    private fun requestPermissions() {
-        ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
-    }
-
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
         if (it[Manifest.permission.CAMERA] == true) {
-            setUpCamera()
+            setUpDetector()
+            binding.viewFinder.post {
+                setUpCamera()
+            }
         } else {
             Log.e(TAG, "Camera permission denied.")
         }
@@ -163,7 +259,10 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     override fun onResume() {
         super.onResume()
         if (allPermissionsGranted()) {
-            setUpCamera()
+            setUpDetector()
+            binding.viewFinder.post {
+                setUpCamera()
+            }
         } else {
             requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
         }
@@ -176,9 +275,10 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         }
     }
 
-    override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
+    override fun onResults(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
         runOnUiThread {
-            binding.inferenceTime.text = "Inference Time: ${inferenceTime}ms"
+            binding.bottomSheetLayout.inferenceTimeVal.text =
+                String.format("%d ms", inferenceTime)
             binding.overlay.apply {
                 setResults(boundingBoxes)
                 invalidate()
@@ -186,17 +286,14 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         }
     }
 
-    override fun onBackPressed() {
-        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
-            finishAfterTransition() // Workaround for Android Q memory leak issue.
-        } else {
-            super.onBackPressed()
+    override fun onError(error: String) {
+        runOnUiThread {
+            Toast.makeText(baseContext, error, Toast.LENGTH_SHORT).show()
         }
     }
 
     companion object {
         private const val TAG = "Camera"
-        private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
     }
 }

@@ -3,22 +3,31 @@ package com.nazar.yolov8android
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.SystemClock
+import android.util.Log
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
+import org.tensorflow.lite.nnapi.NnApiDelegate
 import org.tensorflow.lite.support.common.FileUtil
 import org.tensorflow.lite.support.common.ops.CastOp
 import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
+import org.tensorflow.lite.task.core.BaseOptions
+import org.tensorflow.lite.task.vision.detector.Detection
+import org.tensorflow.lite.task.vision.detector.ObjectDetector
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStream
 import java.io.InputStreamReader
 
 class ObjectDetectorHelper(
+    var threshold: Float = 0.5f,
+    var numThreads: Int = 2,
+    var maxResults: Int = 3,
+    var currentDelegate: Int = 0,
     private val context: Context,
     private val detectorListener: DetectorListener
 ) {
@@ -36,13 +45,39 @@ class ObjectDetectorHelper(
         .add(CastOp(INPUT_IMAGE_TYPE))
         .build()
 
-    fun setup(toggleGpu: Boolean = true) {
+    private var objectDetector: ObjectDetector? = null
+
+    init {
+        setupObjectDetector()
+    }
+
+    fun clearObjectDetector() {
+        objectDetector = null
+    }
+
+    fun setupObjectDetector() {
         close()  // Ensure any existing interpreter is closed
 
-        val options = if (toggleGpu) {
-            configureGpuOptions()
-        } else {
-            Interpreter.Options().apply { setNumThreads(4) }
+        // Configure interpreter options
+        val options = Interpreter.Options().apply {
+            when (currentDelegate) {
+                DELEGATE_CPU -> {
+                    setNumThreads(numThreads)
+                }
+                DELEGATE_GPU -> {
+                    if (CompatibilityList().isDelegateSupportedOnThisDevice) {
+                        val delegateOptions = CompatibilityList().bestOptionsForThisDevice
+                        addDelegate(GpuDelegate(delegateOptions))
+                    } else {
+                        setNumThreads(numThreads)
+                        detectorListener?.onError("GPU is not supported on this device")
+                    }
+                }
+                DELEGATE_NNAPI -> {
+                    addDelegate(NnApiDelegate())
+                    setNumThreads(numThreads)
+                }
+            }
         }
 
         try {
@@ -52,18 +87,6 @@ class ObjectDetectorHelper(
             loadLabels()
         } catch (e: IOException) {
             e.printStackTrace()
-        }
-    }
-
-    private fun configureGpuOptions(): Interpreter.Options {
-        val compatList = CompatibilityList()
-        return Interpreter.Options().apply {
-            if (compatList.isDelegateSupportedOnThisDevice) {
-                val delegateOptions = compatList.bestOptionsForThisDevice
-                addDelegate(GpuDelegate(delegateOptions))
-            } else {
-                setNumThreads(4)
-            }
         }
     }
 
@@ -109,6 +132,10 @@ class ObjectDetectorHelper(
             return
         }
 
+        if (objectDetector == null) {
+            setupObjectDetector()
+        }
+
         val startTime = SystemClock.uptimeMillis()
 
         val resizedBitmap = Bitmap.createScaledBitmap(frame, tensorWidth, tensorHeight, false)
@@ -125,7 +152,7 @@ class ObjectDetectorHelper(
         if (bestBoxes == null) {
             detectorListener.onEmptyDetect()
         } else {
-            detectorListener.onDetect(bestBoxes, inferenceTime)
+            detectorListener.onResults(bestBoxes, inferenceTime)
         }
     }
 
@@ -193,7 +220,8 @@ class ObjectDetectorHelper(
 
     interface DetectorListener {
         fun onEmptyDetect()
-        fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long)
+        fun onError(error: String)
+        fun onResults(boundingBoxes: List<BoundingBox>, inferenceTime: Long)
     }
 
     companion object {
@@ -203,5 +231,21 @@ class ObjectDetectorHelper(
         private val OUTPUT_IMAGE_TYPE = DataType.FLOAT32
         private const val CONFIDENCE_THRESHOLD = 0.3F
         private const val IOU_THRESHOLD = 0.5F
+        const val DELEGATE_CPU = 0
+        const val DELEGATE_GPU = 1
+        const val DELEGATE_NNAPI = 2
     }
 }
+data class BoundingBox(
+    val x1: Float,
+    val y1: Float,
+    val x2: Float,
+    val y2: Float,
+    val cx: Float,
+    val cy: Float,
+    val w: Float,
+    val h: Float,
+    val cnf: Float,
+    val classIdx: Int,
+    val clsName: String
+)

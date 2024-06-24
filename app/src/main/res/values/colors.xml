@@ -5,7 +5,6 @@
     <color name="white">#FFFFFFFF</color>
 
     <!-- Accent Colors -->
-    <color name="bounding_box_color">#FF6F00</color> <!-- Orange for bounding boxes -->
     <color name="button_color">#7308BD</color> <!-- Purple for buttons -->
 
     <!-- Neutral Colors -->
@@ -17,4 +16,14 @@
     <color name="blue">#FF0000FF</color>
     <color name="light_gray">#FFCCCCCC</color>
     <color name="dark_gray">#FF444444</color>
+
+    <!-- TF Branding Orange -->
+    <color name="bounding_box_color">#FF6F00</color>
+    <color name="toolbar_background">#EEEEEE</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="bottom_sheet_background">#EEEEEE</color>
+    <color name="bottom_sheet_text_color">@android:color/black</color>
+    <color name="icActive">#FFFFFFFF</color>
+    <color name="icFocused">#DDFFFFFF</color>
+    <color name="icPressed">#AAFFFFFF</color>
 </resources>

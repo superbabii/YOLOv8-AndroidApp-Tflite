@@ -6,4 +6,7 @@
     </style>
 
     <style name="Theme.yolov8android" parent="Base.Theme.yolov8android" />
+    <style name="BottomSheetSpinnerItemStyle" parent="Widget.AppCompat.Light.DropDownItem.Spinner">
+        <item name="android:textSize">@dimen/bottom_sheet_text_size</item>
+    </style>
 </resources>
