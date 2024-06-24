@@ -92,7 +92,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
         // When clicked, increase the number of objects that can be detected at a time
         binding.bottomSheetLayout.maxResultsPlus.setOnClickListener {
-            if (detector.maxResults < 5) {
+            if (detector.maxResults < 10) {
                 detector.maxResults++
                 updateControlsUi()
             }

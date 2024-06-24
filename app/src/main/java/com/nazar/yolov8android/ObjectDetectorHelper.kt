@@ -195,6 +195,7 @@ class ObjectDetectorHelper(
         val selectedBoxes = mutableListOf<BoundingBox>()
 
         for (box in sortedBoxes) {
+            if (selectedBoxes.size >= maxResults) break
             if (selectedBoxes.none { calculateIoU(it, box) >= IOU_THRESHOLD }) {
                 selectedBoxes.add(box)
             }
