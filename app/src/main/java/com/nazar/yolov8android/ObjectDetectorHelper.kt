@@ -27,7 +27,7 @@ class ObjectDetectorHelper(
     var threshold: Float = 0.5f,
     var numThreads: Int = 2,
     var maxResults: Int = 3,
-    var currentDelegate: Int = 0,
+    var currentDelegate: Int = DELEGATE_CPU,
     private val context: Context,
     private val detectorListener: DetectorListener
 ) {
@@ -61,22 +61,17 @@ class ObjectDetectorHelper(
         // Configure interpreter options
         val options = Interpreter.Options().apply {
             when (currentDelegate) {
-                DELEGATE_CPU -> {
-                    setNumThreads(numThreads)
-                }
+                DELEGATE_CPU -> setNumThreads(numThreads)
                 DELEGATE_GPU -> {
                     if (CompatibilityList().isDelegateSupportedOnThisDevice) {
                         val delegateOptions = CompatibilityList().bestOptionsForThisDevice
                         addDelegate(GpuDelegate(delegateOptions))
                     } else {
                         setNumThreads(numThreads)
-                        detectorListener?.onError("GPU is not supported on this device")
+                        detectorListener.onError("GPU is not supported on this device")
                     }
                 }
-                DELEGATE_NNAPI -> {
-                    addDelegate(NnApiDelegate())
-                    setNumThreads(numThreads)
-                }
+                DELEGATE_NNAPI -> addDelegate(NnApiDelegate())
             }
         }
 
@@ -87,6 +82,7 @@ class ObjectDetectorHelper(
             loadLabels()
         } catch (e: IOException) {
             e.printStackTrace()
+            detectorListener.onError("Model or labels could not be loaded: ${e.message}")
         }
     }
 
@@ -105,6 +101,8 @@ class ObjectDetectorHelper(
 
             numChannel = outputShape[1]
             numElements = outputShape[2]
+        } ?: run {
+            detectorListener.onError("Interpreter is not initialized.")
         }
     }
 
@@ -119,6 +117,7 @@ class ObjectDetectorHelper(
             }
         } catch (e: IOException) {
             e.printStackTrace()
+            detectorListener.onError("Labels could not be loaded: ${e.message}")
         }
     }
 
@@ -129,11 +128,8 @@ class ObjectDetectorHelper(
 
     fun detect(frame: Bitmap) {
         if (interpreter == null || tensorWidth == 0 || tensorHeight == 0 || numChannel == 0 || numElements == 0) {
+            detectorListener.onError("Interpreter or tensor shapes are not properly initialized.")
             return
-        }
-
-        if (objectDetector == null) {
-            setupObjectDetector()
         }
 
         val startTime = SystemClock.uptimeMillis()
