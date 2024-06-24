@@ -156,7 +156,7 @@ class ObjectDetectorHelper(
         val boundingBoxes = mutableListOf<BoundingBox>()
 
         for (c in 0 until numElements) {
-            var maxConf = CONFIDENCE_THRESHOLD
+            var maxConf = threshold
             var maxIdx = -1
             var j = 4
             var arrayIdx = c + numElements * j
@@ -169,7 +169,7 @@ class ObjectDetectorHelper(
                 arrayIdx += numElements
             }
 
-            if (maxConf > CONFIDENCE_THRESHOLD && maxIdx in 0 until labels.size) {
+            if (maxConf > threshold && maxIdx in 0 until labels.size) {
                 val clsName = labels[maxIdx]
                 val cx = array[c]
                 val cy = array[c + numElements]
@@ -225,7 +225,6 @@ class ObjectDetectorHelper(
         private const val INPUT_STANDARD_DEVIATION = 255f
         private val INPUT_IMAGE_TYPE = DataType.FLOAT32
         private val OUTPUT_IMAGE_TYPE = DataType.FLOAT32
-        private const val CONFIDENCE_THRESHOLD = 0.3F
         private const val IOU_THRESHOLD = 0.5F
         const val DELEGATE_CPU = 0
         const val DELEGATE_GPU = 1
