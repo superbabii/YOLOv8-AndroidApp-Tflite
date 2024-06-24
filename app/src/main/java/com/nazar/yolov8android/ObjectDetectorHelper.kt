@@ -27,7 +27,7 @@ class ObjectDetectorHelper(
     var threshold: Float = 0.5f,
     var numThreads: Int = 2,
     var maxResults: Int = 3,
-    var currentDelegate: Int = DELEGATE_CPU,
+    var currentDelegate: Int = 0,
     private val context: Context,
     private val detectorListener: DetectorListener
 ) {
@@ -59,19 +59,22 @@ class ObjectDetectorHelper(
         close()  // Ensure any existing interpreter is closed
 
         // Configure interpreter options
-        val options = Interpreter.Options().apply {
-            when (currentDelegate) {
-                DELEGATE_CPU -> setNumThreads(numThreads)
-                DELEGATE_GPU -> {
-                    if (CompatibilityList().isDelegateSupportedOnThisDevice) {
-                        val delegateOptions = CompatibilityList().bestOptionsForThisDevice
-                        addDelegate(GpuDelegate(delegateOptions))
-                    } else {
-                        setNumThreads(numThreads)
-                        detectorListener.onError("GPU is not supported on this device")
-                    }
+        val options = Interpreter.Options()
+
+        when (currentDelegate) {
+            DELEGATE_CPU -> options.numThreads = numThreads
+            DELEGATE_GPU -> {
+                if (CompatibilityList().isDelegateSupportedOnThisDevice) {
+                    val delegateOptions = CompatibilityList().bestOptionsForThisDevice
+                    options.addDelegate(GpuDelegate(delegateOptions))
+                    options.numThreads = numThreads
+                } else {
+                    options.numThreads = numThreads
+                    detectorListener.onError("GPU is not supported on this device")
                 }
-                DELEGATE_NNAPI -> addDelegate(NnApiDelegate())
+            }
+            DELEGATE_NNAPI -> {
+                options.addDelegate(NnApiDelegate())
             }
         }
 
