@@ -56,12 +56,15 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     }
 
     private fun setUpDetector() {
-        cameraExecutor.execute {
-            detector = ObjectDetectorHelper(0.5f, 2, 3, 0, baseContext, this)
-            detector.setupObjectDetector()
-        }
+        detector = ObjectDetectorHelper(
+            threshold = 0.5f,
+            numThreads = 2,
+            maxResults = 3,
+            currentDelegate = ObjectDetectorHelper.DELEGATE_CPU,
+            context = this,
+            detectorListener = this
+        )
     }
-
     private fun initBottomSheetControls() {
         // When clicked, lower detection score threshold floor
         binding.bottomSheetLayout.thresholdMinus.setOnClickListener {
@@ -121,9 +124,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
                     updateControlsUi()
                 }
 
-                override fun onNothingSelected(p0: AdapterView<*>?) {
-                    /* no op */
-                }
+                override fun onNothingSelected(p0: AdapterView<*>?) {}
             }
 
         // When clicked, change the underlying model used for object detection
@@ -143,15 +144,10 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
     // Update the values displayed in the bottom sheet. Reset detector.
     private fun updateControlsUi() {
-        binding.bottomSheetLayout.maxResultsValue.text =
-            detector.maxResults.toString()
-        binding.bottomSheetLayout.thresholdValue.text =
-            String.format("%.2f", detector.threshold)
-        binding.bottomSheetLayout.threadsValue.text =
-            detector.numThreads.toString()
+        binding.bottomSheetLayout.maxResultsValue.text = detector.maxResults.toString()
+        binding.bottomSheetLayout.thresholdValue.text = String.format("%.2f", detector.threshold)
+        binding.bottomSheetLayout.threadsValue.text = detector.numThreads.toString()
 
-        // Needs to be cleared instead of reinitialized because the GPU
-        // delegate needs to be initialized on the thread using it when applicable
         detector.clearObjectDetector()
         binding.overlay.clear()
     }
@@ -214,7 +210,6 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     }
 
     private fun detectObjects(image: ImageProxy) {
-        // Copy out RGB bits to the shared bitmap buffer
         image.use { bitmapBuffer.copyPixelsFromBuffer(image.planes[0].buffer) }
 
         val matrix = Matrix().apply {
@@ -229,8 +224,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
             matrix, true
         )
 
-        detector?.detect(rotatedBitmap)
-//        image.close()
+        detector.detect(rotatedBitmap)
     }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
@@ -277,8 +271,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
     override fun onResults(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
         runOnUiThread {
-            binding.bottomSheetLayout.inferenceTimeVal.text =
-                String.format("%d ms", inferenceTime)
+            binding.bottomSheetLayout.inferenceTimeVal.text = String.format("%d ms", inferenceTime)
             binding.overlay.apply {
                 setResults(boundingBoxes)
                 invalidate()
