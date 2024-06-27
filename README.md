@@ -1,4 +1,4 @@
-# YOLOv8 Android App
+# YOLOv8 Android App - Tflite
 
 This repository contains an Android application utilizing a TensorFlow Lite model based on YOLOv8 for object detection.
 
