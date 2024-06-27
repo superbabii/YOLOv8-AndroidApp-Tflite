@@ -19,14 +19,17 @@ import org.tensorflow.lite.task.core.BaseOptions
 import org.tensorflow.lite.task.vision.detector.Detection
 import org.tensorflow.lite.task.vision.detector.ObjectDetector
 import java.io.BufferedReader
+import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.InputStreamReader
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 
 class ObjectDetectorHelper(
-    var threshold: Float = 0.5f,
-    var numThreads: Int = 2,
-    var maxResults: Int = 3,
+    var threshold: Float = 0.2f,
+    var numThreads: Int = 4,
+    var maxResults: Int = 5,
     var currentDelegate: Int = 0,
     private val context: Context,
     private val detectorListener: DetectorListener
@@ -35,10 +38,10 @@ class ObjectDetectorHelper(
     private var interpreter: Interpreter? = null
     private val labels = mutableListOf<String>()
 
-    private var tensorWidth = 0
-    private var tensorHeight = 0
-    private var numChannel = 0
-    private var numElements = 0
+    private var tensorWidth: Int = 0
+    private var tensorHeight: Int = 0
+    private var numChannel: Int = 0
+    private var numElements: Int = 0
 
     private val imageProcessor = ImageProcessor.Builder()
         .add(NormalizeOp(INPUT_MEAN, INPUT_STANDARD_DEVIATION))
@@ -56,33 +59,23 @@ class ObjectDetectorHelper(
     }
 
     fun setupObjectDetector() {
-        close()  // Ensure any existing interpreter is closed
+        interpreter?.close()
 
         // Configure interpreter options
         val options = Interpreter.Options()
 
-        when (currentDelegate) {
-            DELEGATE_CPU -> options.numThreads = numThreads
-            DELEGATE_GPU -> {
-                if (CompatibilityList().isDelegateSupportedOnThisDevice) {
-                    val delegateOptions = CompatibilityList().bestOptionsForThisDevice
-                    options.addDelegate(GpuDelegate(delegateOptions))
-                    options.numThreads = numThreads
-                } else {
-                    options.numThreads = numThreads
-                    detectorListener.onError("GPU is not supported on this device")
-                }
-            }
-            DELEGATE_NNAPI -> {
-                options.addDelegate(NnApiDelegate())
-            }
+        if (CompatibilityList().isDelegateSupportedOnThisDevice) {
+            options.addDelegate(GpuDelegate(GpuDelegate.Options()))
+        } else {
+            options.setNumThreads(4)
+//            options.addDelegate(NnApiDelegate())
         }
 
         try {
-            val model = FileUtil.loadMappedFile(context, "model.tflite")
+            val model = loadModelFile("model.tflite")
             interpreter = Interpreter(model, options)
             initializeTensorShapes()
-            loadLabels()
+            loadLabels("labels.txt")
         } catch (e: IOException) {
             e.printStackTrace()
             detectorListener.onError("Model or labels could not be loaded: ${e.message}")
@@ -109,9 +102,9 @@ class ObjectDetectorHelper(
         }
     }
 
-    private fun loadLabels() {
+    private fun loadLabels(fileName: String) {
         try {
-            context.assets.open("labels.txt").use { inputStream ->
+            context.assets.open(fileName).use { inputStream ->
                 BufferedReader(InputStreamReader(inputStream)).use { reader ->
                     reader.lineSequence().forEach { line ->
                         if (line.isNotBlank()) labels.add(line)
@@ -122,6 +115,15 @@ class ObjectDetectorHelper(
             e.printStackTrace()
             detectorListener.onError("Labels could not be loaded: ${e.message}")
         }
+    }
+
+    private fun loadModelFile(fileName: String): MappedByteBuffer {
+        val assetFileDescriptor = context.assets.openFd(fileName)
+        val fileInputStream = FileInputStream(assetFileDescriptor.fileDescriptor)
+        val fileChannel = fileInputStream.channel
+        val startOffset = assetFileDescriptor.startOffset
+        val declaredLength = assetFileDescriptor.declaredLength
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
     }
 
     fun close() {

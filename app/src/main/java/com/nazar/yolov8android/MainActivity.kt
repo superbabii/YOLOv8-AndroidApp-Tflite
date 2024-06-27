@@ -57,9 +57,9 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
     private fun setUpDetector() {
         detector = ObjectDetectorHelper(
-            threshold = 0.5f,
-            numThreads = 2,
-            maxResults = 3,
+            threshold = 0.2f,
+            numThreads = 4,
+            maxResults = 5,
             currentDelegate = ObjectDetectorHelper.DELEGATE_CPU,
             context = this,
             detectorListener = this
@@ -99,33 +99,33 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         }
 
         // When clicked, decrease the number of threads used for detection
-        binding.bottomSheetLayout.threadsMinus.setOnClickListener {
-            if (detector.numThreads > 1) {
-                detector.numThreads--
-                updateControlsUi()
-            }
-        }
+//        binding.bottomSheetLayout.threadsMinus.setOnClickListener {
+//            if (detector.numThreads > 1) {
+//                detector.numThreads--
+//                updateControlsUi()
+//            }
+//        }
 
         // When clicked, increase the number of threads used for detection
-        binding.bottomSheetLayout.threadsPlus.setOnClickListener {
-            if (detector.numThreads < 4) {
-                detector.numThreads++
-                updateControlsUi()
-            }
-        }
+//        binding.bottomSheetLayout.threadsPlus.setOnClickListener {
+//            if (detector.numThreads < 4) {
+//                detector.numThreads++
+//                updateControlsUi()
+//            }
+//        }
 
         // When clicked, change the underlying hardware used for inference. Current options are CPU
         // GPU, and NNAPI
-        binding.bottomSheetLayout.spinnerDelegate.setSelection(0, false)
-        binding.bottomSheetLayout.spinnerDelegate.onItemSelectedListener =
-            object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
-                    detector.currentDelegate = p2
-                    updateControlsUi()
-                }
-
-                override fun onNothingSelected(p0: AdapterView<*>?) {}
-            }
+//        binding.bottomSheetLayout.spinnerDelegate.setSelection(0, false)
+//        binding.bottomSheetLayout.spinnerDelegate.onItemSelectedListener =
+//            object : AdapterView.OnItemSelectedListener {
+//                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
+//                    detector.currentDelegate = p2
+//                    updateControlsUi()
+//                }
+//
+//                override fun onNothingSelected(p0: AdapterView<*>?) {}
+//            }
 
         // When clicked, change the underlying model used for object detection
 //        binding.bottomSheetLayout.spinnerModel.setSelection(0, false)
@@ -146,7 +146,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
     private fun updateControlsUi() {
         binding.bottomSheetLayout.maxResultsValue.text = detector.maxResults.toString()
         binding.bottomSheetLayout.thresholdValue.text = String.format("%.2f", detector.threshold)
-        binding.bottomSheetLayout.threadsValue.text = detector.numThreads.toString()
+//        binding.bottomSheetLayout.threadsValue.text = detector.numThreads.toString()
 
         detector.clearObjectDetector()
         binding.overlay.clear()
