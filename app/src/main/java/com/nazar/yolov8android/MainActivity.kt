@@ -83,20 +83,20 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
         }
 
         // When clicked, reduce the number of objects that can be detected at a time
-        binding.bottomSheetLayout.maxResultsMinus.setOnClickListener {
-            if (detector.maxResults > 1) {
-                detector.maxResults--
-                updateControlsUi()
-            }
-        }
+//        binding.bottomSheetLayout.maxResultsMinus.setOnClickListener {
+//            if (detector.maxResults > 1) {
+//                detector.maxResults--
+//                updateControlsUi()
+//            }
+//        }
 
         // When clicked, increase the number of objects that can be detected at a time
-        binding.bottomSheetLayout.maxResultsPlus.setOnClickListener {
-            if (detector.maxResults < 10) {
-                detector.maxResults++
-                updateControlsUi()
-            }
-        }
+//        binding.bottomSheetLayout.maxResultsPlus.setOnClickListener {
+//            if (detector.maxResults < 10) {
+//                detector.maxResults++
+//                updateControlsUi()
+//            }
+//        }
 
         // When clicked, decrease the number of threads used for detection
 //        binding.bottomSheetLayout.threadsMinus.setOnClickListener {
@@ -144,7 +144,7 @@ class MainActivity : AppCompatActivity(), ObjectDetectorHelper.DetectorListener 
 
     // Update the values displayed in the bottom sheet. Reset detector.
     private fun updateControlsUi() {
-        binding.bottomSheetLayout.maxResultsValue.text = detector.maxResults.toString()
+//        binding.bottomSheetLayout.maxResultsValue.text = detector.maxResults.toString()
         binding.bottomSheetLayout.thresholdValue.text = String.format("%.2f", detector.threshold)
 //        binding.bottomSheetLayout.threadsValue.text = detector.numThreads.toString()
 
